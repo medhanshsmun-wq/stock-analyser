@@ -8,7 +8,10 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
-app = FastAPI(title="Company Nexus API")
+app = FastAPI(
+    title="Company Nexus API",
+    root_path="/api" if os.getenv("VERCEL") else ""
+)
 
 app.add_middleware(
     CORSMiddleware,
