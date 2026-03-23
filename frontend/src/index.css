@@ -469,7 +469,7 @@ body {
 }
 
 .analysis-header {
-  height: 72px;
+  height: 64px;
   padding: 0 40px;
   display: flex;
   align-items: center;
@@ -477,6 +477,120 @@ body {
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-panel);
   flex-shrink: 0;
+}
+
+/* Dashboard Tabs */
+.dashboard-tabs {
+  height: 44px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  padding: 0 30px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.dashboard-tab {
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+}
+
+.dashboard-tab:hover {
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+.dashboard-tab.active {
+  color: var(--accent-gold);
+  background: rgba(201, 168, 76, 0.1);
+  border-color: var(--accent-gold-dim);
+}
+
+.split-toggle {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.split-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.split-toggle.active {
+  background: var(--accent-gold);
+  color: var(--bg-primary);
+  border-color: var(--accent-gold);
+}
+
+/* Split View Layout */
+.data-split-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  flex: 1;
+  overflow: hidden;
+  gap: 1px;
+  background: var(--border-strong);
+}
+
+.split-column {
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.split-column:first-child {
+  border-right: 1px solid var(--border-strong);
+}
+
+.split-column .analysis-header {
+  height: 52px;
+  padding: 0 20px;
+}
+
+.split-column .company-name {
+  font-size: 16px;
+}
+
+.split-column .data-content {
+  padding: 20px;
+  gap: 20px;
+}
+
+.split-column .metrics-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.split-column .metric-card {
+  padding: 12px 16px;
+}
+
+.split-column .metric-value {
+  font-size: 18px;
 }
 
 .company-name {
