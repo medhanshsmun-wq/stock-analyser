@@ -21,6 +21,7 @@ app.add_middleware(
 class AnalyzeRequest(BaseModel):
     query: str
     ticker: str = None
+    history: list = []
 
 @app.get("/")
 def read_root():
@@ -29,7 +30,7 @@ def read_root():
 @app.post("/analyze")
 async def analyze_endpoint(request: AnalyzeRequest):
     try:
-        result = analyze_company(request.query, request.ticker)
+        result = analyze_company(request.query, request.ticker, request.history)
         # Append the ML post-processing overview layer
         result["ml_overview"] = build_ml_overview(result["financials"], result["scores"])
         return result

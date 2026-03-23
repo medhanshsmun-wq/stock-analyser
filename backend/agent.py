@@ -113,7 +113,7 @@ def _verify_ticker(sym: str) -> str:
     return None
 
 
-def extract_ticker(query: str, provided_ticker: str = None) -> str:
+def extract_ticker(query: str, provided_ticker: str = None, previous_ticker: str = None) -> str:
     if provided_ticker:
         return provided_ticker.upper().strip()
     q = query.upper().strip()
@@ -133,26 +133,45 @@ def extract_ticker(query: str, provided_ticker: str = None) -> str:
             return clean
 
     # 3. AI Ticker Resolution (Intelligent Fallback)
-    # If the user typed a descriptive name (e.g. "LVMH" or "Siemens")
-    if GENAI_AVAILABLE:
+    conversational_fillers = [
+        "WHAT", "HOW", "WHY", "TELL", "SHOW", "ABOUT", "THEIR", "ITS", "THIS", "THE", 
+        "COMPETITORS", "RISKS", "DEBT", "MARGINS", "THINK", "GOING", "LONG", "SHORT", 
+        "BUY", "SELL", "HOLD", "OPINION", "VIEW", "DO", "YOU", "U", "ARE", "IS", "ME", 
+        "ON", "IN", "FOR", "THAT", "IT"
+    ]
+    
+    # Check if this contains strong follow-up keywords
+    follow_up_keywords = ["THIS", "THEY", "THEM", "IT", "ITS", "THAT", "COMPANY", "STOCK"]
+    has_follow_up_keyword = any(word in q for word in follow_up_keywords)
+    
+    # Calculate filler ratio
+    filler_count = sum(1 for word in words if word.strip(".,?!") in conversational_fillers)
+    is_mostly_filler = (filler_count / len(words)) > 0.4 if len(words) > 0 else False
+    
+    if not is_mostly_filler and len(words) < 15 and GENAI_AVAILABLE:
         try:
-            # Note: generate_with_gemini is defined lower in the file but accessible
-            prompt = f"What is the exact official Yahoo Finance ticker symbol for the company '{query}'? Reply with ONLY the symbol (e.g. AAPL, MC.PA, RELIANCE.NS). No other text, no markdown."
+            prompt = f"What is the exact official Yahoo Finance ticker symbol for the company referenced in: '{query}'? Reply with ONLY the symbol (e.g. AAPL, MC.PA, RELIANCE.NS). If no specific company is mentioned, reply 'NONE'. No other text."
             ai_ticker = generate_with_gemini(prompt)
-            if ai_ticker:
+            if ai_ticker and "NONE" not in ai_ticker.upper():
                 clean_ai = ai_ticker.strip().replace("`", "").upper()
                 if 1 <= len(clean_ai) <= 15 and " " not in clean_ai:
                     return clean_ai
         except Exception:
             pass
 
-    # 4. Naive fallback word extraction
+    # 4. Context fallback: If we were just talking about a ticker and this looks like a follow-up
+    if previous_ticker:
+        # If it's mostly fillers, or has follow-up pronouns, or is very short
+        if is_mostly_filler or has_follow_up_keyword or len(words) <= 6:
+            return previous_ticker
+
+    # 5. Naive fallback word extraction (avoid tiny common words)
     for word in words:
         clean = word.strip(".,?!")
-        if 1 <= len(clean) <= 6 and clean.isalpha():
+        if 3 <= len(clean) <= 6 and clean.isalpha() and clean not in conversational_fillers:
             return clean
             
-    return "AAPL"
+    return previous_ticker or "AAPL"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DATA FETCHING — pulls every meaningful signal from yfinance
@@ -418,7 +437,7 @@ def compute_wizard_score(f: dict) -> dict:
 # PROMPT BUILDER — feeds rich context to the LLM
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_prompt(f: dict, scores: dict, query: str) -> str:
+def build_prompt(f: dict, scores: dict, query: str, history: list = []) -> str:
     def pct(v): return f"{v*100:.1f}%" if v is not None else "N/A"
     def usd(v):
         if v is None: return "N/A"
@@ -431,10 +450,22 @@ def build_prompt(f: dict, scores: dict, query: str) -> str:
     if f.get("analyst_target_mean") and f.get("current_price"):
         upside = (f["analyst_target_mean"] - f["current_price"]) / f["current_price"]
 
-    return f"""
-You are NEXUS, the world's most advanced AI investment analyst — a fusion of Warren Buffett's value instinct, Cathie Wood's growth vision, and a quant hedge fund's data precision. You have just run a full quantitative analysis on **{f.get('name', 'this company')} ({f.get('ticker')})**.
+    # Format history for the prompt
+    history_str = ""
+    if history:
+        history_str = "\n## CONVERSATION HISTORY\n"
+        for msg in history[-5:]: # Last 5 messages for context
+            role = "USER" if msg["role"] == "user" else "NEXUS"
+            content = msg["content"][:300] + "..." if len(msg["content"]) > 300 else msg["content"]
+            history_str += f"{role}: {content}\n"
 
-## THE USER'S QUESTION
+    return f"""
+You are NEXUS, the world's most advanced AI investment analyst.
+You have just run a full quantitative analysis on **{f.get('name', 'this company')} ({f.get('ticker')})**.
+
+{history_str}
+
+## CURRENT USER QUERY
 "{query}"
 
 ## QUANTITATIVE NEXUS SCORES (our proprietary ML scoring engine)
@@ -449,74 +480,58 @@ You are NEXUS, the world's most advanced AI investment analyst — a fusion of W
 | **NEXUS MASTER SCORE** | **{scores.get('oracle_score', '?')} / 100 ({scores.get('grade', '?')})** |
 | **Outlook** | **{scores.get('outlook', '?')}** |
 
-## REAL FINANCIAL DATA
-**Company:** {f.get('name')} | **Sector:** {f.get('sector')} | **Industry:** {f.get('industry')}
-**Market Cap:** {usd(f.get('market_cap'))} | **Enterprise Value:** {usd(f.get('enterprise_value'))}
-**Employees:** {f.get('employees', 'N/A')} | **Country:** {f.get('country')}
-**Business:** {(f.get('summary') or '')[:600]}
-
-**Price Metrics:**
-- Current Price: ${f.get('current_price')} | 52W High: ${f.get('fifty_two_week_high')} | 52W Low: ${f.get('fifty_two_week_low')}
-- Beta: {f.get('beta', 'N/A')}
-
-**Valuation Multiples:**
-- P/E (Trailing): {f.get('pe_ratio', 'N/A')} | P/E (Forward): {f.get('forward_pe', 'N/A')}
-- PEG Ratio: {f.get('peg_ratio', 'N/A')} | P/B: {f.get('price_to_book', 'N/A')}
-- P/S: {f.get('price_to_sales', 'N/A')} | EV/EBITDA: {f.get('ev_to_ebitda', 'N/A')} | EV/Revenue: {f.get('ev_to_revenue', 'N/A')}
-
-**Growth:**
-- Revenue Growth (YoY): {pct(f.get('revenue_growth'))} | Earnings Growth: {pct(f.get('earnings_growth'))}
-- Total Revenue: {usd(f.get('revenue'))} | EBITDA: {usd(f.get('ebitda'))} | Free Cash Flow: {usd(f.get('free_cashflow'))}
-- EPS (Trailing): ${f.get('eps_trailing', 'N/A')} | EPS (Forward): ${f.get('eps_forward', 'N/A')}
-
-**Profitability:**
-- Gross Margin: {pct(f.get('gross_margins'))} | Operating Margin: {pct(f.get('operating_margins'))} | Net Margin: {pct(f.get('profit_margins'))}
-- ROE: {pct(f.get('roe'))} | ROA: {pct(f.get('roa'))}
-
-**Balance Sheet:**
-- Cash: {usd(f.get('total_cash'))} | Debt: {usd(f.get('total_debt'))}
-- Debt/Equity: {f.get('debt_to_equity', 'N/A')} | Current Ratio: {f.get('current_ratio', 'N/A')} | Quick Ratio: {f.get('quick_ratio', 'N/A')}
-
-**Ownership & Sentiment:**
-- Institutional Ownership: {pct(f.get('institutional_ownership'))} | Insider Ownership: {pct(f.get('insider_ownership'))}
-- Short Ratio: {f.get('short_ratio', 'N/A')} | Dividend Yield: {pct(f.get('dividend_yield'))}
-
-**Analyst Consensus ({f.get('analyst_count', '?')} analysts):**
-- Rating: {f.get('analyst_recommendation', 'N/A').upper()} | Mean Target: ${f.get('analyst_target_mean', 'N/A')}
-- Low Target: ${f.get('analyst_target_low', 'N/A')} | High Target: ${f.get('analyst_target_high', 'N/A')}
-- Implied Upside from Mean Target: {pct(upside) if upside is not None else "N/A"}
+## REAL FINANCIAL DATA (Context)
+- **Company:** {f.get('name')} | **Sector:** {f.get('sector')}
+- **Price:** ${f.get('current_price')} | **Market Cap:** {usd(f.get('market_cap'))}
+- **Growth (YoY):** Revenue {pct(f.get('revenue_growth'))} | Earnings {pct(f.get('earnings_growth'))}
+- **Margins:** Gross {pct(f.get('gross_margins'))} | Net {pct(f.get('profit_margins'))}
+- **Ratios:** P/E {f.get('pe_ratio', 'N/A')} | PEG {f.get('peg_ratio', 'N/A')} | Debt/Equity {f.get('debt_to_equity', 'N/A')}
+- **Analyst:** Rating {f.get('analyst_recommendation', 'N/A').upper()} | Target ${f.get('analyst_target_mean', 'N/A')}
 
 ---
 
 ## YOUR TASK
-Write a masterclass-level investment analysis. Be specific, use the real numbers above. Structure your response EXACTLY as:
+If this is a follow-up question (check history), answer the user's specific query BRIEFLY and BRILLIANTLY using the data above.
+If this is a new company request, write a full masterclass-level investment analysis structured exactly as:
 
 ### 🏢 Company Overview
-2-3 sentences: what they do, their competitive moat, market position.
-
+...
 ### 📊 Financial Health Assessment
-Analyze their financials (margins, growth, balance sheet) concretely. Grade each area.
-
+...
 ### 🚀 Bull Case — Why It Could Surge
-3 specific, data-backed reasons to be bullish. Reference real numbers from the data.
-
+...
 ### 🐻 Bear Case — The Risks
-3 specific risks grounded in the data.
-
+...
 ### 🔭 12-Month Price Prediction
-Give a concrete bear, base, and bull price target with percentages. Base your logic on the analyst consensus and your own valuation framework. State a probability for each scenario.
-
+...
 ### 🏅 Nexus Verdict — {scores.get('oracle_score', '?')}/100 ({scores.get('grade', '?')}) — {scores.get('outlook', '?')}
-Final 2-3 sentence verdict. Who is this stock for? What's the action to take?
+...
 
-Be direct, opinionated, and brilliant. Use bold text for key numbers. Do not hedge excessively — be the world's best analyst.
+Be direct, opinionated, and use bold text for key numbers.
 """
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RICH MOCK FALLBACK (uses real computed data)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_rich_mock_analysis(f: dict, scores: dict) -> str:
+def get_rich_mock_analysis(f: dict, scores: dict, query: str = "") -> str:
+    # Check if this is a follow-up query based on keywords
+    follow_up_keywords = ["DEBT", "RISK", "COMPETITOR", "MARGIN", "WHY", "HOW", "WHAT ABOUT", "TELL ME MORE"]
+    is_follow_up = any(k in query.upper() for k in follow_up_keywords) or (len(query.split()) < 5 and query.strip("?").upper() not in ["APPLE", "TESLA", "RELIANCE", "TCS"])
+
+    if is_follow_up:
+        return f"""### 💬 Nexus Follow-up Analysis: {f.get('name')}
+Nexus has processed your follow-up query: *"{query}"*.
+
+**System Insight:**
+The data indicates that **{f.get('name')}** currently faces {f.get('debt_to_equity', 'moderate')} leverage and {f.get('profit_margins', 'shifting')} margins. 
+For a deeper narrative on **{query}**, please ensure your `GEMINI_API_KEY` is active and has sufficient quota.
+
+**Quick Stats:**
+- **Current Price:** ${f.get('current_price')}
+- **Oracle Verdict:** {scores.get('oracle_score')}/100 ({scores.get('grade')})
+"""
+
     name = f.get("name", "This company")
     ticker = f.get("ticker", "N/A")
     price = f.get("current_price", 0)
@@ -619,7 +634,7 @@ def generate_with_gemini(prompt: str) -> str:
     try:
         client = google_genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3-flash-preview",
             contents=prompt
         )
         return response.text
@@ -627,12 +642,15 @@ def generate_with_gemini(prompt: str) -> str:
         print(f"Gemini error: {e}")
         return None
 
-# ─────────────────────────────────────────────────────────────────────────────
-# MAIN ENTRY POINT
-# ─────────────────────────────────────────────────────────────────────────────
-
-def analyze_company(query: str, ticker: str = None):
-    target_ticker = extract_ticker(query, ticker)
+def analyze_company(query: str, ticker: str = None, history: list = []):
+    # Detect if we have a previous ticker in history
+    previous_ticker = None
+    for msg in reversed(history):
+        if msg.get("ticker"):
+            previous_ticker = msg["ticker"]
+            break
+            
+    target_ticker = extract_ticker(query, ticker, previous_ticker)
 
     try:
         financials, chart_data, quarterly_revenue, quarterly_earnings = get_company_data(target_ticker)
@@ -645,21 +663,14 @@ def analyze_company(query: str, ticker: str = None):
                 target_ticker = ns_ticker
             except Exception:
                 pass
-            else:
-                pass
         else:
             raise ValueError(f"Could not fetch data for '{target_ticker}': {e}")
 
     # Validate we got real price data
     if not financials or not financials.get("current_price"):
-        # Friendly error returned as a normal result so the frontend shows it in chat
         friendly = (
             f"### ❌ Ticker Not Found: `{target_ticker}`\n\n"
-            f"Nexus couldn't find market data for **{query}**. This could mean:\n"
-            f"- The ticker symbol doesn't exist on Yahoo Finance\n"
-            f"- For **Indian stocks**, try entering the NSE ticker directly (e.g. `RELIANCE.NS`, `ZOMATO.NS`)\n"
-            f"- The stock may be delisted or OTC-only\n\n"
-            f"**Try examples:** Apple, Tesla, NVDA, Reliance, TCS, Infosys, Zomato"
+            f"Nexus couldn't find market data for **{query}**. Try entering a valid stock symbol like AAPL or RELIANCE.NS."
         )
         return {
             "ticker": target_ticker,
@@ -676,10 +687,12 @@ def analyze_company(query: str, ticker: str = None):
     scores = compute_wizard_score(financials)
 
     # Try Gemini first, fall back to rich mock
-    prompt = build_prompt(financials, scores, query)
+    prompt = build_prompt(financials, scores, query, history)
     analysis = generate_with_gemini(prompt)
     if not analysis:
-        analysis = get_rich_mock_analysis(financials, scores)
+        # If it's a follow-up but Gemini failed, we should probably still try to give a meaningful response
+        # or just fall back to the rich mock (which is stock-specific)
+        analysis = get_rich_mock_analysis(financials, scores, query)
 
     return {
         "ticker": target_ticker,
