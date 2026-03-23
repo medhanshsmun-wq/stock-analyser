@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Send, Activity, BrainCircuit, History, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:8000' : '/api';
 
 const S = {
   green: '#3ddc84',
