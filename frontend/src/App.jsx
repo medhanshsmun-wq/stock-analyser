@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { Send, Activity, BrainCircuit, History } from 'lucide-react';
+import { Send, Activity, BrainCircuit, History, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const API_URL = 'http://localhost:8000';
@@ -15,22 +15,34 @@ const scoreColor = (s) => s >= 75 ? S.green : s >= 55 ? S.amber : S.red;
 
 function App() {
   const [query, setQuery] = useState('');
-  const [messages, setMessages] = useState([{
-    role: 'ai',
-    content: `Welcome to **Nexus Intelligence**.
-
-This terminal provides institutional-grade quantitative scoring, real-time market data, and AI-driven narrative analysis.
-
-Enter any company name or ticker symbol to begin processing.
-`
-  }]);
+  const [messages, setMessages] = useState([{ role: 'ai', content: 'Nexus standing by. Enter a company name or ticker to initiate deep-scan.' }]);
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [searchHistory, setSearchHistory] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('nexus_history')) || []; }
-    catch { return []; }
-  });
+  
+  // Chat History States
+  const [currentChatId, setCurrentChatId] = useState(null);
+  const [chatHistory, setChatHistory] = useState([]);
+  const [isEditingName, setIsEditingName] = useState(null); // ID of chat being renamed
+
+  // Initial load from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('nexus_chat_history');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setChatHistory(Array.isArray(parsed) ? parsed : []);
+      } catch (e) {
+        console.error("Failed to parse chat history", e);
+        setChatHistory([]);
+      }
+    }
+  }, []);
+
+  // Sync to localStorage
+  useEffect(() => {
+    localStorage.setItem('nexus_chat_history', JSON.stringify(chatHistory));
+  }, [chatHistory]);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -48,28 +60,87 @@ Enter any company name or ticker symbol to begin processing.
 
   const pct = (v) => v != null && v !== 'N/A' ? `${(v * 100).toFixed(1)}%` : '—';
 
+  const startNewChat = () => {
+    setCurrentChatId(null);
+    setMessages([{ role: 'ai', content: 'Nexus standing by. Enter a company name or ticker to initiate deep-scan.' }]);
+    setData(null);
+    setHistoryOpen(false);
+  };
+
+  const loadChat = (chat) => {
+    setCurrentChatId(chat.id);
+    setMessages(chat.messages);
+    setData(chat.data);
+    setHistoryOpen(false);
+  };
+
+  const deleteChat = (e, chatId) => {
+    e.stopPropagation();
+    setChatHistory(prev => prev.filter(c => c.id !== chatId));
+    if (currentChatId === chatId) {
+      startNewChat();
+    }
+  };
+
+  const renameChat = (e, chatId, newName) => {
+    e.stopPropagation();
+    setChatHistory(prev => prev.map(c => c.id === chatId ? { ...c, name: newName } : c));
+    setIsEditingName(null);
+  };
+
   const runQuery = async (q) => {
     if (!q.trim() || isLoading) return;
     const userMsg = { role: 'user', content: q };
-    setMessages(prev => [...prev, userMsg]);
+    const updatedMessages = [...messages, userMsg];
+    setMessages(updatedMessages);
     setQuery('');
     setIsLoading(true);
     setHistoryOpen(false);
     try {
-      const res = await axios.post(`${API_URL}/analyze`, { query: userMsg.content });
-      const { financials, chart_data, quarterly_revenue, quarterly_earnings, scores, analysis, ml_overview } = res.data;
-      setData({ financials, chart_data, quarterly_revenue, quarterly_earnings, scores, ml_overview });
-      setMessages(prev => [...prev, { role: 'ai', content: analysis }]);
+      // Send current messages as history (excluding the very first welcome message)
+      const history = messages.slice(1).map(m => ({ role: m.role, content: m.content, ticker: m.ticker }));
       
-      // Save history
-      if (financials?.ticker) {
-        setSearchHistory(prev => {
-          const item = { ticker: financials.ticker, name: financials.name, score: scores?.oracle_score };
-          const updated = [item, ...prev.filter(h => h.ticker !== financials.ticker)].slice(0, 8);
-          localStorage.setItem('nexus_history', JSON.stringify(updated));
-          return updated;
-        });
-      }
+      const res = await axios.post(`${API_URL}/analyze`, { 
+        query: userMsg.content,
+        history: history
+      });
+      
+      const { ticker, financials, chart_data, quarterly_revenue, quarterly_earnings, scores, analysis, ml_overview } = res.data;
+      const newData = { financials, chart_data, quarterly_revenue, quarterly_earnings, scores, ml_overview };
+      
+      setData(newData);
+      const aiMsg = { role: 'ai', content: analysis, ticker: ticker };
+      const finalMessages = [...updatedMessages, aiMsg];
+      setMessages(finalMessages);
+      
+      // Update or create chat in history
+      setChatHistory(prev => {
+        let updatedHistory = [...prev];
+        const chatId = currentChatId || Date.now().toString();
+        
+        const existingIndex = updatedHistory.findIndex(c => c.id === chatId);
+        const chatName = existingIndex >= 0 ? updatedHistory[existingIndex].name : (financials?.name || q);
+        
+        const chatObj = {
+          id: chatId,
+          name: chatName,
+          timestamp: Date.now(),
+          messages: finalMessages,
+          data: newData,
+          tickers: existingIndex >= 0 
+            ? Array.from(new Set([...updatedHistory[existingIndex].tickers, ticker].filter(Boolean)))
+            : [ticker].filter(Boolean)
+        };
+
+        if (existingIndex >= 0) {
+          updatedHistory[existingIndex] = chatObj;
+        } else {
+          updatedHistory.unshift(chatObj);
+          setCurrentChatId(chatId);
+        }
+        return updatedHistory;
+      });
+
     } catch (err) {
       setMessages(prev => [...prev, { role: 'ai', content: `**System Error:** ${err.message}` }]);
     } finally {
@@ -125,29 +196,70 @@ Enter any company name or ticker symbol to begin processing.
         </div>
         <div className="topbar-right">
           <div className="history-container">
-            <button className="history-btn" onClick={() => setHistoryOpen(!historyOpen)}>
+            <button 
+              className="history-btn" 
+              onClick={() => setHistoryOpen(!historyOpen)}
+              style={historyOpen ? { borderColor: 'var(--accent-gold)', color: 'var(--accent-gold)' } : {}}
+            >
               <History size={13} />
               Recent Intel
             </button>
             {historyOpen && (
               <div className="history-menu">
-                {searchHistory.length === 0 ? (
-                  <div className="history-empty">No target intelligence found.</div>
-                ) : (
-                  searchHistory.map((h, i) => (
-                    <div key={i} className="history-item" onClick={() => runQuery(h.ticker)}>
-                      <div className="history-item-left">
-                        <span className="history-item-ticker">{h.ticker}</span>
-                        <span className="history-item-name">{h.name}</span>
+                <div className="history-hub-header">
+                  <span className="panel-label" style={{ fontSize: '9px', color: 'var(--accent-gold)' }}>History Hub</span>
+                  <button className="new-chat-btn" onClick={startNewChat}>
+                    <Plus size={10} /> NEW CHAT
+                  </button>
+                </div>
+                <div className="history-list">
+                  {chatHistory.length === 0 ? (
+                    <div className="history-empty">No target intelligence found.</div>
+                  ) : (
+                    chatHistory.map(chat => (
+                      <div 
+                        key={chat.id} 
+                        className={`history-item ${currentChatId === chat.id ? 'active' : ''}`}
+                        onClick={() => loadChat(chat)}
+                      >
+                        <div className="history-item-left">
+                          {isEditingName === chat.id ? (
+                            <input 
+                              autoFocus
+                              className="history-rename-input"
+                              defaultValue={chat.name}
+                              onClick={e => e.stopPropagation()}
+                              onBlur={e => renameChat(e, chat.id, e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') renameChat(e, chat.id, e.target.value);
+                                if (e.key === 'Escape') setIsEditingName(null);
+                              }}
+                            />
+                          ) : (
+                            <>
+                              <span className="history-item-name">{chat.name}</span>
+                              <span className="history-item-ticker">
+                                {chat.tickers.join(', ')} • {new Date(chat.timestamp).toLocaleDateString()}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        <div className="history-item-actions">
+                          <Edit2 
+                            size={12} 
+                            className="history-action-icon"
+                            onClick={(e) => { e.stopPropagation(); setIsEditingName(chat.id); }}
+                          />
+                          <Trash2 
+                            size={12} 
+                            className="history-action-icon delete"
+                            onClick={(e) => deleteChat(e, chat.id)}
+                          />
+                        </div>
                       </div>
-                      {h.score !== undefined && (
-                        <span className="history-item-score" style={{ color: scoreColor(h.score) }}>
-                          {h.score}
-                        </span>
-                      )}
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
             )}
           </div>

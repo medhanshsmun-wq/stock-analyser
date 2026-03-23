@@ -121,7 +121,7 @@ body {
   top: 100%;
   right: 0;
   margin-top: 8px;
-  width: 240px;
+  width: 280px;
   background: var(--bg-card);
   border: 1px solid var(--border-strong);
   border-radius: 4px;
@@ -131,6 +131,82 @@ body {
   flex-direction: column;
   overflow: hidden;
   animation: slideDown 0.15s ease-out forwards;
+}
+
+.history-hub-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-panel);
+}
+
+.new-chat-btn {
+  background: rgba(201, 168, 76, 0.1);
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold-dim);
+  border-radius: 2px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.new-chat-btn:hover {
+  background: var(--accent-gold);
+  color: var(--bg-primary);
+}
+
+.history-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.history-item.active {
+  background: var(--bg-elevated);
+  border-left: 2px solid var(--accent-gold);
+}
+
+.history-item-actions {
+  display: flex;
+  gap: 10px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.history-item:hover .history-item-actions {
+  opacity: 1;
+}
+
+.history-action-icon {
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.history-action-icon:hover {
+  color: var(--text-primary);
+}
+
+.history-action-icon.delete:hover {
+  color: var(--score-red);
+}
+
+.history-rename-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--accent-gold);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 2px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  width: 100%;
+  outline: none;
 }
 
 @keyframes slideDown {
