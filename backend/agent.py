@@ -618,7 +618,6 @@ For a deeper narrative on **{query}**, please ensure your `GEMINI_API_KEY` is ac
 
 {upside_str}
 
-> **Note:** To unlock live Gemini AI analysis with deeper narrative and real-time reasoning, add your `GEMINI_API_KEY` to `backend/.env`.
 
 ### 🏅 Nexus Verdict — {oracle_score}/100 ({grade}) — {outlook}
 **{name}** scores **{oracle_score}/100** on the Nexus proprietary scoring engine across valuation, growth, profitability, and balance sheet health. {"This represents a compelling opportunity — the data supports a meaningful position for investors with a 12-18 month horizon." if oracle_score >= 65 else "The risk/reward is balanced but warrants careful position sizing and close monitoring of upcoming earnings." if oracle_score >= 45 else "The data signals elevated risk — defensive investors should wait for a better entry point or catalyst."}

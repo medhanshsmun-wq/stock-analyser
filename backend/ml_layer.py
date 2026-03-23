@@ -13,6 +13,7 @@ Returns a structured dict that the API sends to the frontend
 for rendering the "Oracle Intelligence Overview" card.
 """
 
+import os
 from typing import Optional
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -243,8 +244,5 @@ def build_ml_overview(financials: dict, scores: dict) -> dict:
         "valuation_divergence": _valuation_divergence(financials),
         "ownership": _ownership_signal(financials),
         "action_matrix": _action_matrix(financials, scores),
-        "powered_by_gemini": bool(
-            __import__('os').getenv("GEMINI_API_KEY") and
-            __import__('os').getenv("GEMINI_API_KEY") != "your_gemini_api_key_here"
-        ),
+        "powered_by_gemini": bool(os.getenv("GEMINI_API_KEY") and os.getenv("GEMINI_API_KEY") != "your_gemini_api_key_here"),
     }
