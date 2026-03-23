@@ -230,6 +230,7 @@ def get_company_data(ticker_symbol: str):
         "summary": _safe("longBusinessSummary", ""),
         "website": _safe("website", ""),
         "employees": _safe("fullTimeEmployees", "N/A"),
+        "currency": _safe("currency", "USD"),
         # Price & Cap
         "current_price": _safe("currentPrice", 0),
         "market_cap": _safe("marketCap", 0),

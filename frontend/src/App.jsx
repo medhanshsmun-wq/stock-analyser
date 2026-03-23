@@ -53,14 +53,14 @@ function App() {
   const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   useEffect(() => { scrollToBottom(); }, [messages, isLoading]);
 
-  const fmt = (num) => {
+  const fmt = (num, sym = '$') => {
     if (num === null || num === undefined || num === 'N/A') return '—';
     if (typeof num === 'string') return num;
     const abs = Math.abs(num);
-    if (abs >= 1e12) return `$${(num / 1e12).toFixed(2)}T`;
-    if (abs >= 1e9)  return `$${(num / 1e9).toFixed(2)}B`;
-    if (abs >= 1e6)  return `$${(num / 1e6).toFixed(2)}M`;
-    return `$${num.toLocaleString()}`;
+    if (abs >= 1e12) return `${sym}${(num / 1e12).toFixed(2)}T`;
+    if (abs >= 1e9)  return `${sym}${(num / 1e9).toFixed(2)}B`;
+    if (abs >= 1e6)  return `${sym}${(num / 1e6).toFixed(2)}M`;
+    return `${sym}${num.toLocaleString()}`;
   };
 
   const pct = (v) => v != null && v !== 'N/A' ? `${(v * 100).toFixed(1)}%` : '—';
@@ -210,6 +210,12 @@ function App() {
       { label: 'Hidden Gem',    score: scores.hidden_gem },
     ];
 
+    const getSymbol = (code) => {
+      const symbols = { 'USD': '$', 'INR': '₹', 'EUR': '€', 'GBP': '£', 'JPY': '¥' };
+      return symbols[code] || '$';
+    };
+    const sym = getSymbol(financials.currency);
+
     return (
       <>
         <div className="analysis-header">
@@ -231,14 +237,14 @@ function App() {
             </div>
             <div className="metrics-grid">
               {[
-                { label: 'Current Price', value: `$${financials.current_price}` },
-                { label: 'Market Cap',    value: fmt(financials.market_cap) },
+                { label: 'Current Price', value: fmt(financials.current_price, sym) },
+                { label: 'Market Cap',    value: fmt(financials.market_cap, sym) },
                 { label: 'P/E Ratio',     value: financials.pe_ratio?.toFixed(1) ?? '—' },
-                { label: 'Total Revenue', value: fmt(financials.revenue) },
+                { label: 'Total Revenue', value: fmt(financials.revenue, sym) },
                 { label: 'Net Margin',    value: pct(financials.profit_margins) },
-                { label: '52W High',      value: `$${financials.fifty_two_week_high}` },
-                { label: '52W Low',       value: `$${financials.fifty_two_week_low}` },
-                { label: 'Free Cash Flow',value: fmt(financials.free_cashflow) },
+                { label: '52W High',      value: fmt(financials.fifty_two_week_high, sym) },
+                { label: '52W Low',       value: fmt(financials.fifty_two_week_low, sym) },
+                { label: 'Free Cash Flow',value: fmt(financials.free_cashflow, sym) },
               ].map((m, i) => (
                 <div key={i} className="metric-card">
                   <div className="metric-label">{m.label}</div>
@@ -324,7 +330,7 @@ function App() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e2433" vertical={false} />
                   <XAxis dataKey="date" stroke="#2a3044" tick={{ fill: '#4a5568', fontSize: 10, fontFamily: 'IBM Plex Mono' }} minTickGap={60} />
-                  <YAxis domain={['auto','auto']} stroke="#2a3044" tick={{ fill: '#4a5568', fontSize: 10, fontFamily: 'IBM Plex Mono' }} tickFormatter={v => `$${v}`} width={45} />
+                  <YAxis domain={['auto','auto']} stroke="#2a3044" tick={{ fill: '#4a5568', fontSize: 10, fontFamily: 'IBM Plex Mono' }} tickFormatter={v => `${sym}${v}`} width={45} />
                   <Tooltip contentStyle={{ background: '#0a0c10', border: '1px solid #2a3044', borderRadius: '2px', fontSize: '12px', fontFamily: 'IBM Plex Mono' }} itemStyle={{ color: '#c9a84c' }} labelStyle={{ color: '#8892a4' }} />
                   <Area type="monotone" dataKey="price" stroke="#c9a84c" strokeWidth={1.5} fillOpacity={1} fill="url(#gold)" dot={false} />
                 </AreaChart>
@@ -344,7 +350,7 @@ function App() {
                   <BarChart data={companyData.quarterly_revenue} barSize={24}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e2433" vertical={false} />
                     <XAxis dataKey="quarter" stroke="#2a3044" tick={{ fill: '#4a5568', fontSize: 9, fontFamily: 'IBM Plex Mono' }} />
-                    <Tooltip contentStyle={{ background: '#0a0c10', border: '1px solid #2a3044', borderRadius: '2px', fontSize: '11px', fontFamily: 'IBM Plex Mono' }} formatter={v => fmt(v)} />
+                    <Tooltip contentStyle={{ background: '#0a0c10', border: '1px solid #2a3044', borderRadius: '2px', fontSize: '11px', fontFamily: 'IBM Plex Mono' }} formatter={v => fmt(v, sym)} />
                     <Bar dataKey="revenue" radius={[2,2,0,0]}>
                       {companyData.quarterly_revenue.map((_, i) => (
                         <Cell key={i} fill={i === companyData.quarterly_revenue.length - 1 ? '#c9a84c' : '#2a3044'} />
