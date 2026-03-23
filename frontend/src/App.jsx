@@ -162,8 +162,8 @@ function App() {
         return updatedHistory;
       });
 
-    } catch (err) {
-      setMessages(prev => [...prev, { role: 'ai', content: `**System Error:** ${err.message}` }]);
+      const errorDetail = err.response?.data?.detail || err.message;
+      setMessages(prev => [...prev, { role: 'ai', content: `**System Error:** ${errorDetail}` }]);
     } finally {
       setIsLoading(false);
     }

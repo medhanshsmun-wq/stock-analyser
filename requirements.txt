@@ -2,7 +2,12 @@ fastapi
 uvicorn
 yfinance
 google-genai
+google-auth
 python-dotenv
 pandas
 numpy
 pydantic
+requests
+multitasking
+beautifulsoup4
+lxml

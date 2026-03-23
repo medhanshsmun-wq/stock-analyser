@@ -6,7 +6,7 @@ from agent import analyze_company
 from ml_layer import build_ml_overview
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 app = FastAPI(title="Company Nexus API")
 
