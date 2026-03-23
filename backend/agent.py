@@ -634,7 +634,7 @@ def generate_with_gemini(prompt: str) -> str:
     try:
         client = google_genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-3-flash-preview",
+            model_id = "gemini-3.1-pro-preview",
             contents=prompt
         )
         return response.text
