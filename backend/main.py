@@ -1,0 +1,37 @@
+import os
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from agent import analyze_company
+from ml_layer import build_ml_overview
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = FastAPI(title="Company Nexus API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+class AnalyzeRequest(BaseModel):
+    query: str
+    ticker: str = None
+
+@app.get("/")
+def read_root():
+    return {"status": "Nexus Backend is Running"}
+
+@app.post("/analyze")
+async def analyze_endpoint(request: AnalyzeRequest):
+    try:
+        result = analyze_company(request.query, request.ticker)
+        # Append the ML post-processing overview layer
+        result["ml_overview"] = build_ml_overview(result["financials"], result["scores"])
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

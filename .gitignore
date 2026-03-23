@@ -1,0 +1,6 @@
+# .env should never be committed to version control
+backend/.env
+backend/venv/
+frontend/node_modules/
+__pycache__/
+*.pyc
