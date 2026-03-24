@@ -518,6 +518,27 @@ body {
   border-color: var(--accent-gold-dim);
 }
 
+.tab-close-icon {
+  opacity: 0;
+  transition: all 0.2s;
+  padding: 2px;
+  border-radius: 2px;
+  color: var(--text-muted);
+}
+
+.dashboard-tab:hover .tab-close-icon {
+  opacity: 1;
+}
+
+.tab-close-icon:hover {
+  background: rgba(240, 82, 82, 0.1);
+  color: var(--score-red);
+}
+
+.tab-label {
+  pointer-events: none;
+}
+
 .split-toggle {
   margin-left: auto;
   padding: 6px 12px;

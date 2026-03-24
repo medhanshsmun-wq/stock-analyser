@@ -7,3 +7,4 @@ sys.path.append(root)
 sys.path.append(os.path.join(root, 'backend'))
 
 from backend.main import app
+    

@@ -169,6 +169,47 @@ function App() {
     }
   };
 
+  const deleteTicker = (e, tickerToDelete) => {
+    e.stopPropagation();
+    
+    setChatHistory(prev => {
+      const updatedHistory = prev.map(chat => {
+        if (chat.id === currentChatId) {
+          const { [tickerToDelete]: removed, ...remainingCompanies } = chat.companies;
+          const remainingTickers = chat.tickers.filter(t => t !== tickerToDelete);
+          
+          let newActiveTicker = chat.activeTicker;
+          if (newActiveTicker === tickerToDelete) {
+            newActiveTicker = remainingTickers.length > 0 ? remainingTickers[remainingTickers.length - 1] : null;
+          }
+          
+          return {
+            ...chat,
+            companies: remainingCompanies,
+            tickers: remainingTickers,
+            activeTicker: newActiveTicker
+          };
+        }
+        return chat;
+      });
+      return updatedHistory;
+    });
+
+    // Update local state if it's the current chat
+    const currentChat = chatHistory.find(c => c.id === currentChatId);
+    if (currentChat) {
+      const remainingTickers = currentChat.tickers.filter(t => t !== tickerToDelete);
+      if (activeTicker === tickerToDelete) {
+        const nextTicker = remainingTickers.length > 0 ? remainingTickers[remainingTickers.length - 1] : null;
+        setActiveTicker(nextTicker);
+        setData(nextTicker ? currentChat.companies[nextTicker] : null);
+      }
+      if (remainingTickers.length < 2) {
+        setIsSplitView(false);
+      }
+    }
+  };
+
   const handleSend = (e) => {
     e.preventDefault();
     runQuery(query);
@@ -523,7 +564,12 @@ function App() {
                     setData(currentChat.companies[t]);
                   }}
                 >
-                  {t}
+                  <span className="tab-label">{t}</span>
+                  <X 
+                    size={10} 
+                    className="tab-close-icon" 
+                    onClick={(e) => deleteTicker(e, t)}
+                  />
                 </div>
               ))}
               {currentTickers.length >= 2 && (
