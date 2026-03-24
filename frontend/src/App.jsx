@@ -182,6 +182,17 @@ function App() {
           if (newActiveTicker === tickerToDelete) {
             newActiveTicker = remainingTickers.length > 0 ? remainingTickers[remainingTickers.length - 1] : null;
           }
+
+          // If this is the current chat, also update local states immediately
+          if (activeTicker === tickerToDelete) {
+            const nextTicker = newActiveTicker;
+            setActiveTicker(nextTicker);
+            setData(nextTicker ? remainingCompanies[nextTicker] : null);
+          }
+          
+          if (remainingTickers.length < 2) {
+            setIsSplitView(false);
+          }
           
           return {
             ...chat,
@@ -194,20 +205,6 @@ function App() {
       });
       return updatedHistory;
     });
-
-    // Update local state if it's the current chat
-    const currentChat = chatHistory.find(c => c.id === currentChatId);
-    if (currentChat) {
-      const remainingTickers = currentChat.tickers.filter(t => t !== tickerToDelete);
-      if (activeTicker === tickerToDelete) {
-        const nextTicker = remainingTickers.length > 0 ? remainingTickers[remainingTickers.length - 1] : null;
-        setActiveTicker(nextTicker);
-        setData(nextTicker ? currentChat.companies[nextTicker] : null);
-      }
-      if (remainingTickers.length < 2) {
-        setIsSplitView(false);
-      }
-    }
   };
 
   const handleSend = (e) => {
@@ -585,13 +582,12 @@ function App() {
 
           {data ? (
             isSplitView && currentTickers.length >= 2 ? (
-              <div className="data-split-container">
-                <div className="split-column">
-                  <DataSection companyData={currentChat.companies[currentTickers[0]]} />
-                </div>
-                <div className="split-column">
-                  <DataSection companyData={currentChat.companies[currentTickers[1]]} />
-                </div>
+              <div className="data-split-container" style={{ gridTemplateColumns: `repeat(${currentTickers.length}, 1fr)` }}>
+                {currentTickers.map(t => (
+                  <div key={t} className="split-column">
+                    <DataSection companyData={currentChat.companies[t]} />
+                  </div>
+                ))}
               </div>
             ) : (
               <div style={{ flex: 1, overflowY: 'auto' }}>

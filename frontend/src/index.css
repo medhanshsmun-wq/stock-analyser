@@ -519,20 +519,22 @@ body {
 }
 
 .tab-close-icon {
-  opacity: 0;
+  opacity: 0.4;
   transition: all 0.2s;
   padding: 2px;
-  border-radius: 2px;
+  border-radius: 20px;
   color: var(--text-muted);
+  margin-left: 4px;
 }
 
 .dashboard-tab:hover .tab-close-icon {
   opacity: 1;
+  color: var(--text-primary);
 }
 
 .tab-close-icon:hover {
-  background: rgba(240, 82, 82, 0.1);
-  color: var(--score-red);
+  background: var(--score-red);
+  color: white !important;
 }
 
 .tab-label {
